@@ -4,7 +4,7 @@ import numpy as np
 import torch
 from torch import nn
 import torch.nn.functional as F
-import assistment_process
+from snack import assistment_process
 import pandas as pd
 import scipy.sparse as sp
 import tqdm
@@ -26,28 +26,49 @@ class RCDNet(nn.Module):
         self.item_layer = nn.Embedding(self.item_num, self.embed_size)
         self.skill_layer = nn.Embedding(self.skill_num, self.embed_size)
 
+        torch.nn.init.xavier_normal_(self.user_layer.weight)
+        torch.nn.init.xavier_normal_(self.item_layer.weight)
+        torch.nn.init.xavier_normal_(self.skill_layer.weight)
+
+
+
         # Liner Transformation Layer
         '''Stu Fusion'''
         self.stu_item_attention_layer = nn.Linear(self.embed_size * 2, 1, bias=False)
         self.stu_fusion_transformation_layer = nn.Linear(self.embed_size, self.embed_size, bias=False)
+        torch.nn.init.xavier_normal_(self.stu_item_attention_layer.weight)
+        torch.nn.init.xavier_normal_(self.stu_fusion_transformation_layer.weight)
 
         '''Item Fusion'''
         self.item_stu_attention_layer = nn.Linear(self.embed_size * 2, 1, bias=False)
         self.item_skill_attention_layer = nn.Linear(self.embed_size * 2, 1, bias=False)
         self.item_fusion_transformation_layer_4_stu = nn.Linear(self.embed_size, self.embed_size, bias=False)
         self.item_fusion_transformation_layer_4_skill = nn.Linear(self.embed_size, self.embed_size, bias=False)
+        torch.nn.init.xavier_normal_(self.item_stu_attention_layer.weight)
+        torch.nn.init.xavier_normal_(self.item_skill_attention_layer.weight)
+        torch.nn.init.xavier_normal_(self.item_fusion_transformation_layer_4_stu.weight)
+        torch.nn.init.xavier_normal_(self.item_fusion_transformation_layer_4_skill.weight)
+
 
         self.map_level_item_stu_attention_layer = nn.Linear(self.embed_size * 2, 1, bias=False)
         self.map_level_item_skill_attention_layer = nn.Linear(self.embed_size * 2, 1, bias=False)
+        torch.nn.init.xavier_normal_(self.map_level_item_stu_attention_layer.weight)
+        torch.nn.init.xavier_normal_(self.map_level_item_skill_attention_layer.weight)
 
         '''Skill Fusion'''
         self.skill_item_attention_layer = nn.Linear(self.embed_size * 2, 1, bias=False)
         self.skill_fusion_transformation_layer_4_item = nn.Linear(self.embed_size, self.embed_size, bias=False)
+        torch.nn.init.xavier_normal_(self.skill_item_attention_layer.weight)
+        torch.nn.init.xavier_normal_(self.skill_fusion_transformation_layer_4_item.weight)
 
         '''Prediction Layer'''
         self.fuse_stu_skill_layer = nn.Linear(self.embed_size * 2, self.embed_size)
         self.fuse_item_skill_layer = nn.Linear(self.embed_size * 2, self.embed_size)
         self.performance_prediction_layer = nn.Linear(self.embed_size, 1)
+        torch.nn.init.xavier_normal_(self.fuse_stu_skill_layer.weight)
+        torch.nn.init.xavier_normal_(self.fuse_item_skill_layer.weight)
+        torch.nn.init.xavier_normal_(self.performance_prediction_layer.weight)
+        
 
 
     def adj_matrix_creation(self, source='as0910'):
