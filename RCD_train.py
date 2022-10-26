@@ -1,11 +1,7 @@
 import numpy as np
 import random
 from sklearn.model_selection import KFold, StratifiedKFold
-from model import NCDF
-from model import pmf_cd
-from model import SGD_PMF
-from model import tradition_CF
-from snack import DINA_GD_dataloader
+import DINA_GD_dataloader
 from psy import EmDina, MlDina
 import torch
 import torch.nn as nn
@@ -40,7 +36,7 @@ if __name__ == '__main__':
         k_value = 10
 
         '''RCD-Ration-aware Cognitive Diagnosis'''
-        train_data = DINA_GD_dataloader.as_GD_DINA_Dataset(train_data, q)
+        train_data = RCD_dataloader.as_RCD_Dataset(train_data, q)
         train_dataloder = DataLoader(dataset=train_data, batch_size=256, shuffle=True)
 
         net = RCD.RCDNet(stu_num, item_num, skill_num, device)
@@ -88,7 +84,7 @@ if __name__ == '__main__':
                 rmse = 0
 
                 net.eval()
-                test_data = DINA_GD_dataloader.as_GD_DINA_Dataset(test_data, q)
+                test_data = RCD_dataloader.as_RCD_Dataset(test_data, q)
                 test_dataloder = DataLoader(dataset=test_data, batch_size=1, shuffle=True)
                 for i, (stu_id, ques_id, q_vector, label) in enumerate(test_dataloder, 0):
                     '''Warning: Embedding parameters should be longtensor'''
