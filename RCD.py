@@ -8,7 +8,7 @@ from snack import assistment_process
 import pandas as pd
 import scipy.sparse as sp
 import tqdm
-
+import os
 
 class RCDNet(nn.Module):
     def __init__(self, user_num, item_num, skill_num, device, layer_num=1):
@@ -26,49 +26,28 @@ class RCDNet(nn.Module):
         self.item_layer = nn.Embedding(self.item_num, self.embed_size)
         self.skill_layer = nn.Embedding(self.skill_num, self.embed_size)
 
-        torch.nn.init.xavier_normal_(self.user_layer.weight)
-        torch.nn.init.xavier_normal_(self.item_layer.weight)
-        torch.nn.init.xavier_normal_(self.skill_layer.weight)
-
-
-
         # Liner Transformation Layer
         '''Stu Fusion'''
         self.stu_item_attention_layer = nn.Linear(self.embed_size * 2, 1, bias=False)
         self.stu_fusion_transformation_layer = nn.Linear(self.embed_size, self.embed_size, bias=False)
-        torch.nn.init.xavier_normal_(self.stu_item_attention_layer.weight)
-        torch.nn.init.xavier_normal_(self.stu_fusion_transformation_layer.weight)
 
         '''Item Fusion'''
         self.item_stu_attention_layer = nn.Linear(self.embed_size * 2, 1, bias=False)
         self.item_skill_attention_layer = nn.Linear(self.embed_size * 2, 1, bias=False)
         self.item_fusion_transformation_layer_4_stu = nn.Linear(self.embed_size, self.embed_size, bias=False)
         self.item_fusion_transformation_layer_4_skill = nn.Linear(self.embed_size, self.embed_size, bias=False)
-        torch.nn.init.xavier_normal_(self.item_stu_attention_layer.weight)
-        torch.nn.init.xavier_normal_(self.item_skill_attention_layer.weight)
-        torch.nn.init.xavier_normal_(self.item_fusion_transformation_layer_4_stu.weight)
-        torch.nn.init.xavier_normal_(self.item_fusion_transformation_layer_4_skill.weight)
-
 
         self.map_level_item_stu_attention_layer = nn.Linear(self.embed_size * 2, 1, bias=False)
         self.map_level_item_skill_attention_layer = nn.Linear(self.embed_size * 2, 1, bias=False)
-        torch.nn.init.xavier_normal_(self.map_level_item_stu_attention_layer.weight)
-        torch.nn.init.xavier_normal_(self.map_level_item_skill_attention_layer.weight)
 
         '''Skill Fusion'''
         self.skill_item_attention_layer = nn.Linear(self.embed_size * 2, 1, bias=False)
         self.skill_fusion_transformation_layer_4_item = nn.Linear(self.embed_size, self.embed_size, bias=False)
-        torch.nn.init.xavier_normal_(self.skill_item_attention_layer.weight)
-        torch.nn.init.xavier_normal_(self.skill_fusion_transformation_layer_4_item.weight)
 
         '''Prediction Layer'''
         self.fuse_stu_skill_layer = nn.Linear(self.embed_size * 2, self.embed_size)
         self.fuse_item_skill_layer = nn.Linear(self.embed_size * 2, self.embed_size)
         self.performance_prediction_layer = nn.Linear(self.embed_size, 1)
-        torch.nn.init.xavier_normal_(self.fuse_stu_skill_layer.weight)
-        torch.nn.init.xavier_normal_(self.fuse_item_skill_layer.weight)
-        torch.nn.init.xavier_normal_(self.performance_prediction_layer.weight)
-        
 
 
     def adj_matrix_creation(self, source='as0910'):
@@ -128,9 +107,10 @@ class RCDNet(nn.Module):
         final_item_embeddings = torch.zeros_like(self.item_layer.weight).to(self.device)
         final_skill_embeddings = torch.zeros_like(self.skill_layer.weight).to(self.device)
         for i in range(self.layer_num):
-            '''Stu fusion'''
+            '''-------Stu fusion-------'''
+            print("-------Student Fusion-------")
             stu_item_attention_score = torch.sparse_coo_tensor(size=(self.user_num, self.item_num)).to(self.device)
-            for j in tqdm.tqdm(range(self.user_num)):
+            for j in range(self.user_num):
                 item_index = np.where(indicator[j] == 1)[0]
                 one_user_embed = user_embed[j].repeat(len(item_index), 1)  # [item, emd]
                 one_stu_item_attention_input = torch.cat([self.stu_fusion_transformation_layer(one_user_embed),
@@ -150,10 +130,11 @@ class RCDNet(nn.Module):
             user_embeddings = user_embed + torch.sparse.mm(stu_item_attention_score, transformed_item_embeddings)
             final_user_embeddings = final_user_embeddings + user_embeddings
 
-            '''Item fusion'''
+            '''-------Item fusion-------'''
+            print("-------Exercise Fusion-------")
             item_stu_attention_score = torch.sparse_coo_tensor(size=(self.item_num, self.user_num)).to(self.device)
             item_skill_attention_score = torch.sparse_coo_tensor(size=(self.item_num, self.skill_num)).to(self.device)
-            for j in tqdm.tqdm(range(self.item_num)):
+            for j in range(self.item_num):
                 # attention score for fusing stu
                 user_index = np.where(indicator[:, j] == 1)[0]
                 one_item_embed = item_embed[j].repeat(len(user_index), 1)  # [user,emd]
@@ -199,9 +180,10 @@ class RCDNet(nn.Module):
                               + torch.mul(skill_embeddings_4_item_fusion_attention_score.repeat(1, self.embed_size), skill_embeddings_4_item_fusion)
             final_item_embeddings = final_item_embeddings + item_embeddings
 
-            '''Skill fusion'''
+            '''-------Skill fusion-------'''
+            print("-------Knowledge Concept Fusion-------")
             skill_item_attention_score = torch.sparse_coo_tensor(size=(self.skill_num, self.item_num)).to(self.device)
-            for j in tqdm.tqdm(range(self.skill_num)):
+            for j in range(self.skill_num):
                 item_index = np.where(q[:, j] == 1)[0]
                 one_skill_embed = skill_embed[j].repeat(len(item_index), 1)  # [item, embed]
                 one_skill_item_attention_input = torch.cat([self.skill_fusion_transformation_layer_4_item(one_skill_embed),
@@ -214,13 +196,15 @@ class RCDNet(nn.Module):
                 skill_item_attention_score = skill_item_attention_score.to_sparse()
 
             # [skill, item] mm [item, embed] -> [skill, embed]
-            skill_embeddings = skill_embed + torch.mm(skill_item_attention_score, self.skill_fusion_transformation_layer_4_item(item_embed))  # [skill, embed]
+            skill_embeddings = skill_embed + torch.sparse.mm(skill_item_attention_score, self.skill_fusion_transformation_layer_4_item(item_embed))  # [skill, embed]
             final_skill_embeddings = final_skill_embeddings + skill_embeddings
 
         '''Predictions'''
         final_user_embeddings = final_user_embeddings / self.layer_num
         final_item_embeddings = final_item_embeddings / self.layer_num
         final_skill_embeddings = final_skill_embeddings / self.layer_num
+
+
 
         q_vector = q[item]  # [item, skill]
         predict_user_embed = final_user_embeddings[user]  # [bs, embed]
@@ -233,17 +217,17 @@ class RCDNet(nn.Module):
 
         predict_skill_embed = final_skill_embeddings.unsqueeze(0).repeat(batch_size, 1, 1)  # [bs, skill, embed]
 
-        user_proficiency = self.fuse_stu_skill_layer(torch.cat([predict_user_embed, predict_skill_embed]))  # [bs, skill, embed]
+        user_proficiency = self.fuse_stu_skill_layer(torch.cat([predict_user_embed, predict_skill_embed], dim=-1))  # [bs, skill, embed]
         user_proficiency = torch.sigmoid(user_proficiency)
 
-        item_difficulty = self.fuse_item_skill_layer(torch.cat([predict_item_embed, predict_skill_embed]))  # [bs, skill, embed]
+        item_difficulty = self.fuse_item_skill_layer(torch.cat([predict_item_embed, predict_skill_embed], dim=-1))  # [bs, skill, embed]
         item_difficulty = torch.sigmoid(item_difficulty)
 
         prediction = self.performance_prediction_layer((user_proficiency - item_difficulty))  # [bs, skill, 1]
         prediction = torch.sigmoid(prediction.squeeze(-1))  # [bs, skill]
 
-        # [bs, skill] mm [skill, item] -> [bs, ote,]
-        prediction = torch.mm(prediction, q_vector.T)  # [bs, item]
+        # [bs, skill] mm [skill, item] -> [bs, item]
+        prediction = torch.mm(prediction, torch.FloatTensor(q_vector.T))  # [bs, item]
         prediction = torch.mean(prediction, dim=1)  # [bs]
 
         def get_cdm_skill(user_embeddings, skill_embeddings):
@@ -253,7 +237,7 @@ class RCDNet(nn.Module):
             user_proficiency = self.fuse_stu_skill_layer(torch.cat([user_embeddings, skill_embeddings], dim=1))
             user_proficiency = torch.sigmoid(user_proficiency) # [stu * skill, embed]
 
-            user_mastery = self.performance_prediction_layer(torch.cat([user_proficiency, torch.zeros_like(user_proficiency)]))
+            user_mastery = self.performance_prediction_layer(user_proficiency)
             user_mastery = torch.sigmoid(user_mastery)  # [stu * skill, 1]
 
             user_mastery = user_mastery.view(self.user_num, self.skill_num)
@@ -263,6 +247,7 @@ class RCDNet(nn.Module):
         user_mastery = get_cdm_skill(final_user_embeddings, final_skill_embeddings)
 
         return prediction, user_mastery
+
 
 
 
